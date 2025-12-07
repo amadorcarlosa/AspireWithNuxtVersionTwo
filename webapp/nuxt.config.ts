@@ -3,9 +3,9 @@ export default defineNuxtConfig({
   typescript: {
     tsConfig: {
       compilerOptions: {
-        types: ["node"]
-      }
-    }
+        types: ['node'],
+      },
+    },
   },
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
@@ -14,20 +14,14 @@ export default defineNuxtConfig({
   // Aspire automatically assigns a random port and sets the PORT environment variable.
   // Nuxt/Nitro picks this up automatically, but setting it explicitly is safer for debugging.
   devServer: {
-   port: process.env.PORT ? parseInt(process.env.PORT) : 3000
+    port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
   },
 
   // 2. Service Discovery & Proxying
-  // Aspire 13.0 injects simplified variables like "API_HTTPS" when you use .WithReference(api)
-  nitro: {
-    routeRules: {
-      '/api/**': {
-        // This directs calls from your Vue frontend to your .NET backend
-        // seamlessly in both Dev and Production (Docker).
-        proxy: process.env.ApiUrl 
-          ? `${process.env.ApiUrl}/**` 
-          : 'http://localhost:5000/**' // Fallback if not running in Aspire
-      }
-    }
-  }
-})
+  // Handled by server middleware at runtime (server/api/[...path].ts)
+  // This ensures ApiUrl environment variable is read at runtime, not build time
+  // Make ApiUrl available at runtime
+  runtimeConfig: {
+    apiUrl: process.env.ApiUrl || 'http://localhost:5000',
+  },
+});
