@@ -1,7 +1,12 @@
-
 using Scalar.Aspire;
 
+#pragma warning disable ASPIREACADOMAINS001
+
 var builder = DistributedApplication.CreateBuilder(args);
+
+// Your specific domain and certificate
+var customDomain = builder.AddParameter("customDomain", "amadorcarlos.com", publishValueAsDefault: true);
+var certificateName = builder.AddParameter("certificateName", "amadorcarlos.com-envebis4-251209215047", publishValueAsDefault: true);
 
 builder.AddAzureContainerAppEnvironment("env");
 
@@ -15,7 +20,11 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithExternalHttpEndpoints()
         .WithReference(webapi)
         .WaitFor(webapi)
-        .WithEnvironment("ApiUrl", webapi.GetEndpoint("https"));
+        .WithEnvironment("ApiUrl", webapi.GetEndpoint("https"))
+        .PublishAsAzureContainerApp((module, app) =>
+        {
+            app.ConfigureCustomDomain(customDomain, certificateName);
+        });
 }
 else
 {
@@ -28,7 +37,7 @@ else
     var frontend = builder.AddJavaScriptApp("frontend", "../webapp")
         .WithPnpm()
         .WithRunScript("dev")
-        .WithHttpEndpoint(port: 3000, targetPort: 3000, isProxied: false) // Fixed port
+        .WithHttpEndpoint(port: 3000, targetPort: 3000, isProxied: false)
         .WithExternalHttpEndpoints()
         .WithReference(webapi)
         .WaitFor(webapi)
