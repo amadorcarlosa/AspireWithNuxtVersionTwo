@@ -1,50 +1,38 @@
-using Aspire.Hosting;
-using Projects;
+
 using Scalar.Aspire;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+builder.AddAzureContainerAppEnvironment("env");
 
-// Add the following line to configure the Azure App Container environment
- builder.AddAzureContainerAppEnvironment("env");
-
-
-
-var webapi=builder.AddProject<Projects.webapi>("server");
-
-
-// 3) Add Scalar API Reference (unified UI in Aspire dashboard)
-
+var webapi = builder.AddProject<Projects.webapi>("server");
 
 if (builder.ExecutionContext.IsPublishMode)
 {
-   var frontend = builder.AddNodeApp("frontend", "../webapp", "start")
+    var frontend = builder.AddNodeApp("frontend", "../webapp", "start")
         .WithPnpm()
         .WithHttpEndpoint(env: "PORT")
         .WithExternalHttpEndpoints()
         .WithReference(webapi)
         .WaitFor(webapi)
         .WithEnvironment("ApiUrl", webapi.GetEndpoint("https"));
-
 }
-else{
-    var scalar = builder.AddScalarApiReference(options =>
+else
 {
-    // Global theming/customization for the dashboard
-    options.WithTheme(ScalarTheme.Purple);
-    // You can also set other global options here (hide sidebar, etc.)
-});
-scalar.WithApiReference(webapi);
-var frontend = builder.AddJavaScriptApp("frontend", "../webapp")
-    .WithPnpm()
-    .WithRunScript("dev")
-    .WithHttpEndpoint(env: "PORT") // <--- This must be the string "PORT"
-    .WithExternalHttpEndpoints()
-    .WithReference(webapi)
-    .WaitFor(webapi)
-    .WithEnvironment("ApiUrl", webapi.GetEndpoint("https"));
+    var scalar = builder.AddScalarApiReference(options =>
+    {
+        options.WithTheme(ScalarTheme.Purple);
+    });
+    scalar.WithApiReference(webapi);
+    
+    var frontend = builder.AddJavaScriptApp("frontend", "../webapp")
+        .WithPnpm()
+        .WithRunScript("dev")
+        .WithHttpEndpoint(port: 3000, targetPort: 3000, isProxied: false) // Fixed port
+        .WithExternalHttpEndpoints()
+        .WithReference(webapi)
+        .WaitFor(webapi)
+        .WithEnvironment("ApiUrl", webapi.GetEndpoint("https"));
 }
-
-
 
 builder.Build().Run();

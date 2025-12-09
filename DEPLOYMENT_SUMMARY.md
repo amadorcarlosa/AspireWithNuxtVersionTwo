@@ -5,12 +5,15 @@ This document summarizes the changes made while preparing this Aspire + Nuxt pro
 ## Key Actions Completed
 
 - Added Azure Container Apps support to the AppHost:
+
   - Called the environment API (`AddAzureContainerAppEnvironment("env")`) in the app host builder to enable Azure deployment hooks.
 
 - Fixed local runtime errors and naming conflicts:
+
   - Removed incorrect `PublishAsAzureContainerApp(...)` usage and resolved a naming conflict with the `env` variable so build/publish runs do not throw `Unsupported value type System.Boolean`.
 
 - Initialized azd and provisioned resources locally:
+
   - Ran `azd init` and `azd up` from the `apphost` folder.
   - Resources provisioned include a Resource Group, Azure Container Registry, Log Analytics workspace, and a Container Apps Environment.
   - Deployed the server (.NET) project; endpoints from the successful run:
@@ -18,10 +21,12 @@ This document summarizes the changes made while preparing this Aspire + Nuxt pro
     - Aspire Dashboard: https://aspire-dashboard.ext.blackocean-a955d935.centralus.azurecontainerapps.io
 
 - Configured CI/CD (GitHub Actions):
+
   - Ran `azd pipeline config` which created `.github/workflows/azure-dev.yml` and set up OIDC federated credentials and pipeline repo variables/secrets.
   - Committed and pushed the workflow to trigger the pipeline.
 
 - Azure configuration files moved/committed to repo root for CI:
+
   - `azure.yaml` (moved to repo root and updated to point to `./apphost/apphost.csproj`).
   - `.azure/` directory (environment-specific config) was copied into repo root and committed.
 
@@ -48,7 +53,7 @@ This document summarizes the changes made while preparing this Aspire + Nuxt pro
 
 1. Confirm the GitHub Actions workflow run completes successfully (Actions tab).
 2. If you want the frontend traffic to be served from a single domain, consider adding a reverse-proxy or routing rules in Azure Container Apps or fronting with Azure Front Door.
-3. Optionally update `apphost/AppHost.cs` to include the `AddDockerfile`/`AddNodeApp` registration for the frontend so the build/deploy pipeline automatically picks up the frontend as a service (if you prefer explicit resource mapping in `azure.yaml`).
+3. Updated `apphost/AppHost.cs` to include the frontend via `AddDockerfile("frontend", "../webapp")` so the frontend is registered as a container resource for Aspire/azd deployments. (Committed locally — push required.)
 4. Add monitoring/health checks to both the API and frontend Container Apps and configure alerts in Azure Monitor.
 
 ## Quick commands used during the process
@@ -67,6 +72,7 @@ git push
 ---
 
 If you'd like, I can now:
+
 - Add `AddDockerfile("frontend", "../webapp")` to `apphost/AppHost.cs` and push that change so the frontend is part of the `azure.yaml` mapping, or
 - Help tweak the GitHub Actions workflow to build and deploy both services explicitly.
 
