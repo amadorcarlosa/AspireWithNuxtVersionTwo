@@ -7,6 +7,11 @@ using Microsoft.Identity.Web;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+Console.WriteLine("=== Starting Web API with Authentication ===");
+string? environment = builder.Environment.IsDevelopment() ? "Development" : "Production";
+Console.WriteLine($"Environment: {environment}");
+
+
 
 // 1. Configure Authentication (Cookie + OIDC)
 if (builder.Environment.IsDevelopment())
