@@ -54,8 +54,49 @@ else
         .AddMicrosoftIdentityWebApp(options =>
         {
             builder.Configuration.GetSection("AzureAd").Bind(options);
+
+            options.Events = new OpenIdConnectEvents
+            {
+                OnRedirectToIdentityProvider = context =>
+                {
+                    Console.WriteLine("=== PROD OIDC REDIRECT ===");
+                    Console.WriteLine($"Original RedirectUri: {context.ProtocolMessage.RedirectUri}");
+                    Console.WriteLine($"Request Host: {context.Request.Host}");
+                    Console.WriteLine($"Request Scheme: {context.Request.Scheme}");
+                    Console.WriteLine($"X-Forwarded-Host: {context.Request.Headers["X-Forwarded-Host"]}");
+                    Console.WriteLine($"X-Forwarded-Proto: {context.Request.Headers["X-Forwarded-Proto"]}");
+                    Console.WriteLine($"X-Forwarded-For: {context.Request.Headers["X-Forwarded-For"]}");
+
+                    // Force the public redirect
+                    var forced = "https://amadorcarlos.com/api/signin-oidc";
+                    context.ProtocolMessage.RedirectUri = forced;
+
+                    Console.WriteLine($"Forced RedirectUri: {forced}");
+                    Console.WriteLine("==========================");
+
+                    return Task.CompletedTask;
+                },
+
+                OnAuthenticationFailed = context =>
+                {
+                    Console.WriteLine("=== PROD OIDC AUTH FAILED ===");
+                    Console.WriteLine($"Error: {context.Exception.Message}");
+                    Console.WriteLine($"Inner: {context.Exception.InnerException?.Message}");
+                    Console.WriteLine("=============================");
+                    return Task.CompletedTask;
+                },
+
+                OnTokenValidated = context =>
+                {
+                    Console.WriteLine("=== PROD TOKEN VALIDATED ===");
+                    Console.WriteLine($"User: {context.Principal?.Identity?.Name}");
+                    Console.WriteLine("============================");
+                    return Task.CompletedTask;
+                }
+            };
         });
 }
+
 
 // 2. Configure Cookie
 builder.Services.Configure<CookieAuthenticationOptions>(
