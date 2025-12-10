@@ -35,81 +35,88 @@ import { proxyRequest } from 'h3';
  * @param event - H3 event object containing request details
  * @returns Proxied response from the backend API
  */
+
+
 export default defineEventHandler(async (event) => {
   let path = event.path.replace('/api/', '');
-
-  // For OIDC callbacks, send the full path including /api/ prefix
-  // because the backend's CallbackPath is configured as /api/signin-oidc
+  
+  // For OIDC callbacks, preserve the /api/ prefix
   if (event.path.includes('signin-oidc') || event.path.includes('signout-callback-oidc')) {
-    path = event.path.substring(1); // Remove leading slash, keep /api/
+    path = event.path.substring(1);
   }
 
-  const apiUrl = process.env.services__server__http__0 || 'http://localhost:5105';
+  const apiUrl = process.env.services__server__http__0 || process.env.services__server__https__0 || 'http://localhost:5105';
   const target = `${apiUrl}/${path}`;
-
-  const originalHost = event.node.req.headers.host || 'localhost:3000';
   
-  // Detect protocol from incoming request or environment
-  // In production (Azure Container Apps), traffic comes through HTTPS
-  const isProduction = process.env.NODE_ENV === 'production';
-  
-  // Check the original request's protocol
-  // Azure Container Apps sets x-forwarded-proto header
-  const incomingProto = event.node.req.headers['x-forwarded-proto'] as string;
-  const forwardedProto = incomingProto || (isProduction ? 'https' : 'http');
+  // Use PUBLIC_HOSTNAME in production, fallback to request host in dev
+  const publicHost = process.env.PUBLIC_HOSTNAME || event.node.req.headers.host || 'localhost:3000';
+  const publicProto = process.env.PUBLIC_PROTO || (process.env.NODE_ENV === 'production' ? 'https' : 'http');
 
   console.log('=== PROXY DEBUG ===');
+  console.log('Environment:', process.env.NODE_ENV);
+  console.log('Target:', target);
+  console.log('Public Host:', publicHost);
+  console.log('Public Proto:', publicProto);
   console.log('Original Path:', event.path);
   console.log('Forwarded Path:', path);
-  console.log('Target:', target);
-  console.log('Original Host:', originalHost);
   console.log('Method:', event.method);
-  console.log('Environment:', isProduction ? 'Production' : 'Development');
-  console.log('Forwarded Proto:', forwardedProto);
-  console.log('Incoming x-forwarded-proto:', incomingProto);
   console.log('===================');
 
-  // Make a test fetch first to see what backend returns
-  if (path === 'weatherforecast') {
-    try {
-      const testResponse = await fetch(target, {
-        method: 'GET',
-        headers: {
-          'X-Forwarded-Host': originalHost,
-          'X-Forwarded-Proto': forwardedProto,
-          'X-Forwarded-For': event.node.req.socket.remoteAddress || '::1',
-        },
-      });
-      
-      console.log('=== BACKEND RESPONSE DEBUG ===');
-      console.log('Status:', testResponse.status);
-      console.log('StatusText:', testResponse.statusText);
-      console.log('Headers:', Object.fromEntries(testResponse.headers.entries()));
-      
-      const bodyText = await testResponse.text();
-      console.log('Body (first 500 chars):', bodyText.substring(0, 500));
-      console.log('==============================');
-      
-      // Return the response we captured
-      return new Response(bodyText, {
-        status: testResponse.status,
-        headers: testResponse.headers,
-      });
-    } catch (err) {
-      console.log('=== BACKEND FETCH ERROR ===');
-      console.log('Error:', err);
-      console.log('===========================');
+  // Make the proxied request
+  const response = await fetch(target, {
+    method: event.method,
+    headers: {
+      ...Object.fromEntries(
+        Object.entries(event.node.req.headers)
+          .filter(([key]) => !['host', 'connection'].includes(key.toLowerCase()))
+          .map(([key, value]) => [key, Array.isArray(value) ? value.join(', ') : value || ''])
+      ),
+      'X-Forwarded-Host': publicHost,
+      'X-Forwarded-Proto': publicProto,
+      'X-Forwarded-For': event.node.req.socket.remoteAddress || '::1',
+      'Cookie': event.node.req.headers.cookie || '',
+    },
+    body: ['GET', 'HEAD'].includes(event.method!) ? undefined : await readRawBody(event),
+    redirect: 'manual', // Don't follow redirects
+  });
+
+  // Copy status
+  event.node.res.statusCode = response.status;
+
+  // Copy headers, rewriting Location if needed
+  response.headers.forEach((value, key) => {
+    // Skip headers that shouldn't be forwarded
+    if (['transfer-encoding', 'connection'].includes(key.toLowerCase())) {
+      return;
     }
+
+    // Rewrite Location header if it contains internal URL
+    if (key.toLowerCase() === 'location') {
+      let rewrittenLocation = value;
+      
+      // Replace internal Azure Container Apps URLs
+      if (value.includes('.internal.') || value.includes('.azurecontainerapps.io')) {
+        const internalUrlPattern = /https?:\/\/[^\/]*(?:\.internal\.[^\/]+|\.azurecontainerapps\.io[^\/]*)/;
+        rewrittenLocation = value.replace(internalUrlPattern, `${publicProto}://${publicHost}`);
+        
+        console.log('=== REWRITING LOCATION ===');
+        console.log('Original:', value);
+        console.log('Rewritten:', rewrittenLocation);
+        console.log('==========================');
+      }
+      
+      event.node.res.setHeader(key, rewrittenLocation);
+      return;
+    }
+
+    event.node.res.setHeader(key, value);
+  });
+
+  // Return body
+  if (response.body) {
+    const arrayBuffer = await response.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
   }
 
-  return proxyRequest(event, target, {
-    fetchOptions: {
-      redirect: 'manual',
-    },
-    headers: {
-      'X-Forwarded-Host': originalHost,
-      'X-Forwarded-Proto': forwardedProto,
-      'X-Forwarded-For': event.node.req.socket.remoteAddress || '::1',
-    },
-  });
+  return null;
 });
