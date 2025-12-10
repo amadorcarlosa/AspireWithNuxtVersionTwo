@@ -130,29 +130,20 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Add request logging middleware
-app.Use(async (context, next) =>
-{
-    Console.WriteLine($"=== REQUEST: {context.Request.Method} {context.Request.Path} ===");
-    Console.WriteLine($"Host: {context.Request.Host}");
-    Console.WriteLine($"X-Forwarded-Host: {context.Request.Headers["X-Forwarded-Host"]}");
-    Console.WriteLine($"X-Forwarded-Proto: {context.Request.Headers["X-Forwarded-Proto"]}");
-    Console.WriteLine($"X-Forwarded-For: {context.Request.Headers["X-Forwarded-For"]}");
-    await next();
-});
-
-// Add this BEFORE app.UseAuthentication()
+// ADD THIS BEFORE app.UseAuthentication() and other middleware
 var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
-    ForwardedHeaders = ForwardedHeaders.All,
-    RequireHeaderSymmetry = false
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | 
+                       ForwardedHeaders.XForwardedProto | 
+                       ForwardedHeaders.XForwardedHost
 };
-// Trust all proxies in container environment
+// Clear the lists to trust ALL proxies (required for Azure Container Apps internal networking)
 forwardedHeadersOptions.KnownNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 
 app.UseForwardedHeaders(forwardedHeadersOptions);
 
+// Then authentication, authorization, etc.
 app.UseAuthentication();
 app.UseAuthorization();
 
