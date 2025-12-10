@@ -71,51 +71,52 @@ else
         {
             builder.Configuration.GetSection("AzureAd").Bind(options);
             
-            // Use authorization code flow (same as dev)
-            options.ResponseType = "code";
+        
 
-            options.Events = new OpenIdConnectEvents
-            {
-                OnRedirectToIdentityProvider = context =>
-                {
-                    Console.WriteLine("=== PROD OIDC REDIRECT ===");
-                    Console.WriteLine($"Original RedirectUri: {context.ProtocolMessage.RedirectUri}");
-                    Console.WriteLine($"Request Host: {context.Request.Host}");
-                    Console.WriteLine($"Request Scheme: {context.Request.Scheme}");
-                    Console.WriteLine($"X-Public-Host: {context.Request.Headers["X-Public-Host"]}");
-                    Console.WriteLine($"X-Public-Proto: {context.Request.Headers["X-Public-Proto"]}");
-
-                    // Force the public redirect URI
-                    context.ProtocolMessage.RedirectUri = "https://amadorcarlos.com/api/signin-oidc";
-
-                    Console.WriteLine($"Forced RedirectUri: {context.ProtocolMessage.RedirectUri}");
-                    Console.WriteLine("==========================");
-
-                    return Task.CompletedTask;
-                },
-
-                OnAuthenticationFailed = context =>
-                {
-                    Console.WriteLine("=== PROD OIDC AUTH FAILED ===");
-                    Console.WriteLine($"Error: {context.Exception.Message}");
-                    Console.WriteLine($"Inner: {context.Exception.InnerException?.Message}");
-                    Console.WriteLine("=============================");
-                    return Task.CompletedTask;
-                },
-
-                OnTokenValidated = context =>
-                {
-                    Console.WriteLine("=== PROD TOKEN VALIDATED ===");
-                    Console.WriteLine($"User: {context.Principal?.Identity?.Name}");
-                    Console.WriteLine("============================");
-                    return Task.CompletedTask;
-                }
-            };
+        
         }, 
         configureCookieAuthenticationOptions: null,
         openIdConnectScheme: OpenIdConnectDefaults.AuthenticationScheme,
         cookieScheme: CookieAuthenticationDefaults.AuthenticationScheme,
-        subscribeToOpenIdConnectMiddlewareDiagnosticsEvents: true);
+        subscribeToOpenIdConnectMiddlewareDiagnosticsEvents: true)
+        .EnableTokenAcquisitionToCallDownstreamApi()
+        .AddInMemoryTokenCaches();
+
+
+        builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
+    {
+        options.ResponseType = "code";
+        options.CallbackPath = "/api/signin-oidc";
+        options.SignedOutCallbackPath = "/api/signout-callback-oidc";
+
+        options.Events = new OpenIdConnectEvents
+        {
+            OnRedirectToIdentityProvider = context =>
+            {
+                Console.WriteLine("=== PROD OIDC REDIRECT ===");
+                Console.WriteLine($"Original RedirectUri: {context.ProtocolMessage.RedirectUri}");
+                context.ProtocolMessage.RedirectUri = "https://amadorcarlos.com/api/signin-oidc";
+                Console.WriteLine($"Forced RedirectUri: {context.ProtocolMessage.RedirectUri}");
+                Console.WriteLine("==========================");
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine("=== PROD OIDC AUTH FAILED ===");
+                Console.WriteLine($"Error: {context.Exception.Message}");
+                Console.WriteLine($"Inner: {context.Exception.InnerException?.Message}");
+                Console.WriteLine("=============================");
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                Console.WriteLine("=== PROD TOKEN VALIDATED ===");
+                Console.WriteLine($"User: {context.Principal?.Identity?.Name}");
+                Console.WriteLine("============================");
+                return Task.CompletedTask;
+            }
+        };
+    });
 }
 
 // 2. Configure Cookie
