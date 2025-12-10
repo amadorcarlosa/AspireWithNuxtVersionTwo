@@ -4,38 +4,7 @@
  * @description
  * Universal proxy handler for forwarding /api/* requests to the .NET backend.
  * Implements the Backend for Frontend (BFF) pattern for authentication and API routing.
- *
- * Architecture:
- * 1. Browser makes requests to Nuxt at localhost:3000/api/*
- * 2. Nuxt proxies these to .NET backend at localhost:5105/*
- * 3. Browser receives cookies set for localhost:3000 domain
- * 4. Authentication redirects are passed through to the browser (not followed by proxy)
- *
- * @remarks
- * The X-Forwarded-* headers are critical for authentication flows.
- * .NET's ForwardedHeadersMiddleware reads these headers to determine the original
- * request host/port/scheme, which is used to generate correct OIDC redirect URIs.
- *
- * The redirect: 'manual' option prevents the proxy from following authentication
- * redirects, allowing the browser to handle them directly and preserve the user flow.
- *
- * Special handling for OIDC callbacks:
- * - signin-oidc and signout-callback-oidc paths preserve the /api/ prefix
- * - This matches the backend's CallbackPath configuration (/api/signin-oidc)
  */
-import { proxyRequest } from 'h3';
-
-/**
- * Handles all /api/* route requests and proxies them to the backend.
- *
- * Special path handling:
- * - OIDC callback paths (signin-oidc, signout-callback-oidc) preserve the /api/ prefix
- * - All other paths strip the /api/ prefix before forwarding
- *
- * @param event - H3 event object containing request details
- * @returns Proxied response from the backend API
- */
-
 
 export default defineEventHandler(async (event) => {
   let path = event.path.replace('/api/', '');
@@ -96,8 +65,21 @@ export default defineEventHandler(async (event) => {
       
       // Replace internal Azure Container Apps URLs
       if (value.includes('.internal.') || value.includes('.azurecontainerapps.io')) {
-        const internalUrlPattern = /https?:\/\/[^\/]*(?:\.internal\.[^\/]+|\.azurecontainerapps\.io[^\/]*)/;
-        rewrittenLocation = value.replace(internalUrlPattern, `${publicProto}://${publicHost}`);
+        // Extract the path from the internal URL
+        const internalUrlPattern = /https?:\/\/[^\/]*(?:\.internal\.[^\/]+|\.azurecontainerapps\.io[^\/]*)(\/.*)?/;
+        const match = value.match(internalUrlPattern);
+        
+        if (match) {
+          let backendPath = match[1] || '/';
+          
+          // Add /api/ prefix if the path doesn't already have it
+          // Since all browser requests come through /api/* but backend paths don't have /api/
+          if (!backendPath.startsWith('/api/') && !backendPath.startsWith('/api?')) {
+            backendPath = '/api' + backendPath;
+          }
+          
+          rewrittenLocation = `${publicProto}://${publicHost}${backendPath}`;
+        }
         
         console.log('=== REWRITING LOCATION ===');
         console.log('Original:', value);
