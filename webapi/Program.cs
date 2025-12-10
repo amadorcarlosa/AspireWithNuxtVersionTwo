@@ -196,6 +196,19 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
+app.MapGet("/debug/headers", (HttpContext context) =>
+{
+    return Results.Ok(new
+    {
+        Host = context.Request.Host.ToString(),
+        Scheme = context.Request.Scheme,
+        PathBase = context.Request.PathBase.ToString(),
+        XForwardedHost = context.Request.Headers["X-Forwarded-Host"].ToString(),
+        XForwardedProto = context.Request.Headers["X-Forwarded-Proto"].ToString(),
+        XForwardedFor = context.Request.Headers["X-Forwarded-For"].ToString()
+    });
+});
+
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
