@@ -21,8 +21,6 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithReference(webapi)
         .WaitFor(webapi)
         .WithEnvironment("ApiUrl", webapi.GetEndpoint("https"))
-        .WithEnvironment("PUBLIC_HOSTNAME", "amadorcarlos.com")
-        .WithEnvironment("PUBLIC_PROTO", "https")
         .PublishAsAzureContainerApp((module, app) =>
         {
             app.ConfigureCustomDomain(customDomain, certificateName);
@@ -35,7 +33,7 @@ else
         options.WithTheme(ScalarTheme.Purple);
     });
     scalar.WithApiReference(webapi);
-
+    
     var frontend = builder.AddJavaScriptApp("frontend", "../webapp")
         .WithPnpm()
         .WithRunScript("dev")
