@@ -116,31 +116,30 @@ builder.Services.Configure<CookieAuthenticationOptions>(
     });
 
 // 3. Configure Forwarded Headers (for Nuxt proxy)
+// 3. Configure Forwarded Headers (for Nuxt proxy)
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
-                               ForwardedHeaders.XForwardedProto |
-                               ForwardedHeaders.XForwardedHost;
-    options.ForwardLimit = 1;
+    options.ForwardedHeaders = ForwardedHeaders.All;
+    options.ForwardLimit = null;  // No limit - trust all proxies
     options.KnownProxies.Clear();
-    options.KnownIPNetworks.Clear();
+    options.KnownIPNetworks.Clear();  // Use this instead
 });
 
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// ⚠️ MUST BE FIRST - before any other middleware
 var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor |
-                       ForwardedHeaders.XForwardedProto |
-                       ForwardedHeaders.XForwardedHost
+    ForwardedHeaders = ForwardedHeaders.All,
+    ForwardLimit = null
 };
-forwardedHeadersOptions.KnownIPNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
+forwardedHeadersOptions.KnownIPNetworks.Clear();
 
 app.UseForwardedHeaders(forwardedHeadersOptions);
+
+
 
 // Then authentication, authorization, etc.
 app.UseAuthentication();
@@ -206,6 +205,18 @@ app.MapGet("/debug/headers", (HttpContext context) =>
         XForwardedHost = context.Request.Headers["X-Forwarded-Host"].ToString(),
         XForwardedProto = context.Request.Headers["X-Forwarded-Proto"].ToString(),
         XForwardedFor = context.Request.Headers["X-Forwarded-For"].ToString()
+    });
+});
+app.MapGet("/debug/raw-headers", (HttpContext context) =>
+{
+    var headers = context.Request.Headers
+        .ToDictionary(h => h.Key, h => h.Value.ToString());
+    
+    return Results.Ok(new
+    {
+        Host = context.Request.Host.ToString(),
+        Scheme = context.Request.Scheme,
+        AllHeaders = headers
     });
 });
 
