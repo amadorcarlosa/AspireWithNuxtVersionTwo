@@ -10,7 +10,12 @@ var certificateName = builder.AddParameter("certificateName", "amadorcarlos.com-
 
 builder.AddAzureContainerAppEnvironment("env");
 
-var webapi = builder.AddProject<Projects.webapi>("server");
+var webapi = builder.AddProject<Projects.webapi>("server")
+    .PublishAsAzureContainerApp((module, app) =>
+    {
+        // Allow HTTP traffic for internal container-to-container communication
+        app.Configuration.Ingress.AllowInsecure = true;
+    });
 
 if (builder.ExecutionContext.IsPublishMode)
 {
@@ -20,7 +25,9 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithExternalHttpEndpoints()
         .WithReference(webapi)
         .WaitFor(webapi)
-        .WithEnvironment("ApiUrl", webapi.GetEndpoint("https"))
+        .WithEnvironment("ApiUrl", webapi.GetEndpoint("http"))  // Use http since internal
+        .WithEnvironment("PUBLIC_HOSTNAME", "amadorcarlos.com")
+        .WithEnvironment("PUBLIC_PROTO", "https")
         .PublishAsAzureContainerApp((module, app) =>
         {
             app.ConfigureCustomDomain(customDomain, certificateName);

@@ -43,6 +43,8 @@ export default defineEventHandler(async (event) => {
       'X-Forwarded-Host': publicHost,
       'X-Forwarded-Proto': publicProto,
       'X-Forwarded-For': event.node.req.socket.remoteAddress || '::1',
+      'X-Public-Host': publicHost,      // ADD THIS - custom header Envoy won't touch
+      'X-Public-Proto': publicProto,    // ADD THIS - custom header Envoy won't touch
       'Cookie': event.node.req.headers.cookie || '',
     },
     body: ['GET', 'HEAD'].includes(event.method!) ? undefined : await readRawBody(event),
