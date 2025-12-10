@@ -18,7 +18,7 @@ if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
         .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
-    
+
     // Add detailed OIDC logging
     builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
     {
@@ -105,21 +105,21 @@ else
 
 // 2. Configure Cookie
 builder.Services.Configure<CookieAuthenticationOptions>(
-    CookieAuthenticationDefaults.AuthenticationScheme, 
+    CookieAuthenticationDefaults.AuthenticationScheme,
     options =>
     {
         options.Cookie.Name = "AspireNuxtAuth";
         options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() 
-            ? CookieSecurePolicy.SameAsRequest 
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
             : CookieSecurePolicy.Always;
     });
 
 // 3. Configure Forwarded Headers (for Nuxt proxy)
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | 
-                               ForwardedHeaders.XForwardedProto | 
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
+                               ForwardedHeaders.XForwardedProto |
                                ForwardedHeaders.XForwardedHost;
     options.ForwardLimit = 1;
     options.KnownProxies.Clear();
@@ -133,11 +133,11 @@ var app = builder.Build();
 // ⚠️ MUST BE FIRST - before any other middleware
 var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | 
-                       ForwardedHeaders.XForwardedProto | 
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor |
+                       ForwardedHeaders.XForwardedProto |
                        ForwardedHeaders.XForwardedHost
 };
-forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownIPNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 
 app.UseForwardedHeaders(forwardedHeadersOptions);
@@ -168,7 +168,7 @@ app.MapGet("/auth/user", (HttpContext context) =>
     {
         return Results.Unauthorized();
     }
-    
+
     return Results.Ok(new
     {
         Name = context.User.Identity.Name,

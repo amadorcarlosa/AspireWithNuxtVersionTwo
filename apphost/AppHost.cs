@@ -10,8 +10,7 @@ var certificateName = builder.AddParameter("certificateName", "amadorcarlos.com-
 
 builder.AddAzureContainerAppEnvironment("env");
 
-var webapi = builder.AddProject<Projects.webapi>("server")
-    .WithEnvironment("ASPNETCORE_FORWARDEDHEADERS_ENABLED", "true");
+var webapi = builder.AddProject<Projects.webapi>("server");
 
 if (builder.ExecutionContext.IsPublishMode)
 {
@@ -36,7 +35,7 @@ else
         options.WithTheme(ScalarTheme.Purple);
     });
     scalar.WithApiReference(webapi);
-    
+
     var frontend = builder.AddJavaScriptApp("frontend", "../webapp")
         .WithPnpm()
         .WithRunScript("dev")
