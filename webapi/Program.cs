@@ -141,17 +141,18 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseForwardedHeaders();
-
-if (app.Environment.IsDevelopment())
+// Add this BEFORE app.UseAuthentication()
+var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
-    app.MapOpenApi();
-}
+    ForwardedHeaders = ForwardedHeaders.All,
+    RequireHeaderSymmetry = false
+};
+// Trust all proxies in container environment
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
+app.UseForwardedHeaders(forwardedHeadersOptions);
+
 app.UseAuthentication();
 app.UseAuthorization();
 
