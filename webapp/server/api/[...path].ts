@@ -69,13 +69,46 @@ export default defineEventHandler(async (event) => {
   console.log('Incoming x-forwarded-proto:', incomingProto);
   console.log('===================');
 
+  // Make a test fetch first to see what backend returns
+  if (path === 'weatherforecast') {
+    try {
+      const testResponse = await fetch(target, {
+        method: 'GET',
+        headers: {
+          'X-Forwarded-Host': originalHost,
+          'X-Forwarded-Proto': forwardedProto,
+          'X-Forwarded-For': event.node.req.socket.remoteAddress || '::1',
+        },
+      });
+      
+      console.log('=== BACKEND RESPONSE DEBUG ===');
+      console.log('Status:', testResponse.status);
+      console.log('StatusText:', testResponse.statusText);
+      console.log('Headers:', Object.fromEntries(testResponse.headers.entries()));
+      
+      const bodyText = await testResponse.text();
+      console.log('Body (first 500 chars):', bodyText.substring(0, 500));
+      console.log('==============================');
+      
+      // Return the response we captured
+      return new Response(bodyText, {
+        status: testResponse.status,
+        headers: testResponse.headers,
+      });
+    } catch (err) {
+      console.log('=== BACKEND FETCH ERROR ===');
+      console.log('Error:', err);
+      console.log('===========================');
+    }
+  }
+
   return proxyRequest(event, target, {
     fetchOptions: {
       redirect: 'manual',
     },
     headers: {
       'X-Forwarded-Host': originalHost,
-      'X-Forwarded-Proto': forwardedProto,  // Now dynamic!
+      'X-Forwarded-Proto': forwardedProto,
       'X-Forwarded-For': event.node.req.socket.remoteAddress || '::1',
     },
   });
