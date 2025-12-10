@@ -48,6 +48,15 @@ export default defineEventHandler(async (event) => {
   const target = `${apiUrl}/${path}`;
 
   const originalHost = event.node.req.headers.host || 'localhost:3000';
+  
+  // Detect protocol from incoming request or environment
+  // In production (Azure Container Apps), traffic comes through HTTPS
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  // Check the original request's protocol
+  // Azure Container Apps sets x-forwarded-proto header
+  const incomingProto = event.node.req.headers['x-forwarded-proto'] as string;
+  const forwardedProto = incomingProto || (isProduction ? 'https' : 'http');
 
   console.log('=== PROXY DEBUG ===');
   console.log('Original Path:', event.path);
@@ -55,6 +64,9 @@ export default defineEventHandler(async (event) => {
   console.log('Target:', target);
   console.log('Original Host:', originalHost);
   console.log('Method:', event.method);
+  console.log('Environment:', isProduction ? 'Production' : 'Development');
+  console.log('Forwarded Proto:', forwardedProto);
+  console.log('Incoming x-forwarded-proto:', incomingProto);
   console.log('===================');
 
   return proxyRequest(event, target, {
@@ -63,7 +75,7 @@ export default defineEventHandler(async (event) => {
     },
     headers: {
       'X-Forwarded-Host': originalHost,
-      'X-Forwarded-Proto': 'http',
+      'X-Forwarded-Proto': forwardedProto,  // Now dynamic!
       'X-Forwarded-For': event.node.req.socket.remoteAddress || '::1',
     },
   });
