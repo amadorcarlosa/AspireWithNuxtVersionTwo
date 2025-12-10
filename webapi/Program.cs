@@ -130,14 +130,13 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// ADD THIS BEFORE app.UseAuthentication() and other middleware
+// ⚠️ MUST BE FIRST - before any other middleware
 var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | 
                        ForwardedHeaders.XForwardedProto | 
                        ForwardedHeaders.XForwardedHost
 };
-// Clear the lists to trust ALL proxies (required for Azure Container Apps internal networking)
 forwardedHeadersOptions.KnownNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 
