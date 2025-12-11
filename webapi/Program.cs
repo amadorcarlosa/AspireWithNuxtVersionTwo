@@ -67,6 +67,18 @@ if (builder.Environment.IsDevelopment())
 
 else
 {
+    // Debug: Check if ClientCredentials is configured
+    var clientCreds = builder.Configuration.GetSection("AzureAd:ClientCredentials").GetChildren().ToList();
+    Console.WriteLine($"=== PROD CLIENT CREDENTIALS CONFIG ===");
+    Console.WriteLine($"Number of credentials configured: {clientCreds.Count}");
+    foreach (var cred in clientCreds)
+    {
+        Console.WriteLine($"  SourceType: {cred["SourceType"]}");
+        Console.WriteLine($"  KeyVaultUrl: {cred["KeyVaultUrl"]}");
+        Console.WriteLine($"  KeyVaultCertificateName: {cred["KeyVaultCertificateName"]}");
+    }
+    Console.WriteLine($"======================================");
+
     // Production with Key Vault Certificate
     builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
         .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
