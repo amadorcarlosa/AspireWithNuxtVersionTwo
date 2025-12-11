@@ -67,76 +67,42 @@ if (builder.Environment.IsDevelopment())
 
 else
 {
-    // Production with Federated Credential via Managed Identity
-    var managedIdentityClientId = "a8aa5450-479c-4437-87f9-891d2755d1b2";
-    var appClientId = builder.Configuration["AzureAd:ClientId"] ?? "d5a4dfd5-5bd5-42b4-bb48-cad1217c34a1";
-    
+    // Production with Key Vault Certificate
     builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
         .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
 
-    // Configure OIDC to use Managed Identity for client assertion
     builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
     {
-        options.ResponseType = "code";
-        options.CallbackPath = "/api/signin-oidc";
-        options.SignedOutCallbackPath = "/api/signout-callback-oidc";
-
-        options.Events.OnAuthorizationCodeReceived = async context =>
+        options.Events = new OpenIdConnectEvents
         {
-            Console.WriteLine("=== AUTHORIZATION CODE RECEIVED ===");
-            
-            try
+            OnRedirectToIdentityProvider = context =>
             {
-                // Get token from Managed Identity to use as client assertion
-                var credential = new Azure.Identity.ManagedIdentityCredential(managedIdentityClientId);
-                var tokenResult = await credential.GetTokenAsync(
-                    new Azure.Core.TokenRequestContext(new[] { "api://AzureADTokenExchange/.default" }),
-                    context.HttpContext.RequestAborted);
-                
-                Console.WriteLine($"Got MI token, expires: {tokenResult.ExpiresOn}");
-                
-                // Set the client assertion on the token request
-                context.TokenEndpointRequest!.ClientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
-                context.TokenEndpointRequest.ClientAssertion = tokenResult.Token;
-                
-                Console.WriteLine("=== CLIENT ASSERTION SET ===");
-            }
-            catch (Exception ex)
+                Console.WriteLine("=== PROD OIDC REDIRECT ===");
+                context.ProtocolMessage.RedirectUri = "https://amadorcarlos.com/api/signin-oidc";
+                Console.WriteLine($"RedirectUri: {context.ProtocolMessage.RedirectUri}");
+                Console.WriteLine("==========================");
+                return Task.CompletedTask;
+            },
+
+            OnAuthenticationFailed = context =>
             {
-                Console.WriteLine($"=== MI TOKEN ERROR: {ex.Message} ===");
-                Console.WriteLine($"=== Stack: {ex.StackTrace} ===");
-                throw;
+                Console.WriteLine("=== PROD OIDC AUTH FAILED ===");
+                Console.WriteLine($"Error: {context.Exception.Message}");
+                Console.WriteLine($"Inner: {context.Exception.InnerException?.Message}");
+                Console.WriteLine("=============================");
+                return Task.CompletedTask;
+            },
+
+            OnTokenValidated = context =>
+            {
+                Console.WriteLine("=== PROD TOKEN VALIDATED ===");
+                Console.WriteLine($"User: {context.Principal?.Identity?.Name}");
+                Console.WriteLine("============================");
+                return Task.CompletedTask;
             }
-        };
-
-        options.Events.OnRedirectToIdentityProvider = context =>
-        {
-            Console.WriteLine("=== PROD OIDC REDIRECT ===");
-            context.ProtocolMessage.RedirectUri = "https://amadorcarlos.com/api/signin-oidc";
-            Console.WriteLine($"RedirectUri: {context.ProtocolMessage.RedirectUri}");
-            Console.WriteLine("==========================");
-            return Task.CompletedTask;
-        };
-
-        options.Events.OnAuthenticationFailed = context =>
-        {
-            Console.WriteLine("=== PROD OIDC AUTH FAILED ===");
-            Console.WriteLine($"Error: {context.Exception.Message}");
-            Console.WriteLine($"Inner: {context.Exception.InnerException?.Message}");
-            Console.WriteLine("=============================");
-            return Task.CompletedTask;
-        };
-
-        options.Events.OnTokenValidated = context =>
-        {
-            Console.WriteLine("=== PROD TOKEN VALIDATED ===");
-            Console.WriteLine($"User: {context.Principal?.Identity?.Name}");
-            Console.WriteLine("============================");
-            return Task.CompletedTask;
         };
     });
 }
-
 // 2. Configure Cookie
 builder.Services.Configure<CookieAuthenticationOptions>(
     CookieAuthenticationDefaults.AuthenticationScheme,
