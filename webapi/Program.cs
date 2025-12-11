@@ -71,6 +71,17 @@ else
 {
     // Production: Use Key Vault Certificate via Managed Identity
     Console.WriteLine("=== PROD: Setting up Key Vault Certificate Auth ===");
+    CertificateClientOptions certOptions = new CertificateClientOptions()
+{
+    Retry =
+    {
+        Delay = TimeSpan.FromSeconds(15),
+        MaxDelay = TimeSpan.FromSeconds(16),
+        MaxRetries = 5,
+        Mode = RetryMode.Exponential
+    }
+};
+
     
     var keyVaultUrl = builder.Configuration["AzureAd:ClientCredentials:0:KeyVaultUrl"];
     var certName = builder.Configuration["AzureAd:ClientCredentials:0:KeyVaultCertificateName"];
@@ -81,13 +92,17 @@ else
     Console.WriteLine($"ManagedIdentityClientId: {managedIdentityClientId}");
 
     // Create credential for Key Vault access
-    var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
+  TokenCredential credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
     {
         ManagedIdentityClientId = managedIdentityClientId,
+        ExcludeManagedIdentityCredential = false,
+        ExcludeEnvironmentCredential = false,
         ExcludeVisualStudioCredential = true,
         ExcludeAzureCliCredential = true,
         ExcludeInteractiveBrowserCredential = true
     });
+
+    Console.WriteLine($"=== Created DefaultAzureCredential for Key Vault ===Credential: {credential.GetType().Name}");
 
     // Verify certificate exists in Key Vault
     try
