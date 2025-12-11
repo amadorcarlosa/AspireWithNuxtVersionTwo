@@ -136,8 +136,11 @@ else
                     KeyVaultCertificateName = certName
                 }
             };
-            
-            Console.WriteLine("=== Certificate configured for OIDC ===");
+            msIdentityOptions.SendX5C = true;
+        
+        Console.WriteLine("=== Certificate configured for OIDC ===");
+        Console.WriteLine($"ClientCertificates count: {msIdentityOptions.ClientCertificates?.Length}");
+         
         });
 
     builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
