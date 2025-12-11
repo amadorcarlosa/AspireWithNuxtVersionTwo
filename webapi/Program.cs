@@ -71,17 +71,6 @@ else
 {
     // Production: Use Key Vault Certificate via Managed Identity
     Console.WriteLine("=== PROD: Setting up Key Vault Certificate Auth ===");
-    CertificateClientOptions certOptions = new CertificateClientOptions()
-{
-    Retry =
-    {
-        Delay = TimeSpan.FromSeconds(15),
-        MaxDelay = TimeSpan.FromSeconds(16),
-        MaxRetries = 5,
-        Mode = RetryMode.Exponential
-    }
-};
-
     
     var keyVaultUrl = builder.Configuration["AzureAd:ClientCredentials:0:KeyVaultUrl"];
     var certName = builder.Configuration["AzureAd:ClientCredentials:0:KeyVaultCertificateName"];
@@ -89,22 +78,17 @@ else
     
     Console.WriteLine($"KeyVaultUrl: {keyVaultUrl}");
     Console.WriteLine($"CertName: {certName}");
-    Console.WriteLine($"ManagedIdentityClientId: {managedIdentityClientId}");
 
     // Create credential for Key Vault access
-  TokenCredential credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
+    var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
     {
         ManagedIdentityClientId = managedIdentityClientId,
-        ExcludeManagedIdentityCredential = false,
-        ExcludeEnvironmentCredential = false,
         ExcludeVisualStudioCredential = true,
         ExcludeAzureCliCredential = true,
         ExcludeInteractiveBrowserCredential = true
     });
 
-    Console.WriteLine($"=== Created DefaultAzureCredential for Key Vault ===Credential: {credential.GetType().Name}");
-
-    // Verify certificate exists in Key Vault
+    // Verify certificate exists
     try
     {
         var certClient = new CertificateClient(new Uri(keyVaultUrl!), credential);
@@ -114,19 +98,22 @@ else
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"=== CERTIFICATE VERIFICATION FAILED ===");
-        Console.WriteLine($"Error: {ex.Message}");
-        Console.WriteLine($"=======================================");
+        Console.WriteLine($"=== CERTIFICATE VERIFICATION FAILED: {ex.Message} ===");
     }
 
-    // Configure authentication with certificate from Key Vault
-    builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+    // Configure authentication WITH EnableTokenAcquisitionToCallDownstreamApi
+    builder.Services
+        .AddAuthentication(options =>
+        {
+            options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+        })
         .AddMicrosoftIdentityWebApp(msIdentityOptions =>
         {
-            // Bind base configuration
             builder.Configuration.GetSection("AzureAd").Bind(msIdentityOptions);
             
-            // Override with certificate credentials
             msIdentityOptions.ClientCertificates = new[]
             {
                 new CertificateDescription
@@ -136,12 +123,11 @@ else
                     KeyVaultCertificateName = certName
                 }
             };
-            msIdentityOptions.SendX5C = true;
-        
-        Console.WriteLine("=== Certificate configured for OIDC ===");
-        Console.WriteLine($"ClientCertificates count: {msIdentityOptions.ClientCertificates?.Length}");
-         
-        });
+            
+            Console.WriteLine("=== Certificate configured for OIDC ===");
+        })
+        .EnableTokenAcquisitionToCallDownstreamApi()
+        .AddInMemoryTokenCaches();
 
     builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
     {
