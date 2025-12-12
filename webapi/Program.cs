@@ -125,29 +125,19 @@ else
                     SourceType = CertificateSource.KeyVault,
                     KeyVaultUrl = keyVaultUrl,
                     KeyVaultCertificateName = certName,
+
+                    // <-- THIS is the missing wiring in your current branch
                     ManagedIdentityClientId = managedIdentityClientId
                 }
             };
 
             Console.WriteLine("=== Certificate configured for OIDC (KeyVault) ===");
-            Console.WriteLine($"ClientId: {msIdentityOptions.ClientId}");
-            
-        }).EnableTokenAcquisitionToCallDownstreamApi(
-            () =>
-            {
-                Console.WriteLine("=== Token acquisition for downstream API configured ===");
-            }
-        )
-        .AddInMemoryTokenCaches(
-            () =>
-            {
-                Console.WriteLine("=== In-memory token cache configured ===");
-            }
-        );
+        })
+        .EnableTokenAcquisitionToCallDownstreamApi()
+        .AddInMemoryTokenCaches();
 
-
-}  // Keep logging, but DO NOT overwrite Microsoft.Identity.Web's event handlers.
-
+    // Keep logging, but DO NOT overwrite Microsoft.Identity.Web's event handlers.
+}
 
 
 // 2. Configure Cookie
