@@ -136,7 +136,7 @@ else
         .EnableTokenAcquisitionToCallDownstreamApi()
         .AddInMemoryTokenCaches();
 
-    // Keep logging, but DO NOT overwrite Microsoft.Identity.Web's event handlers.
+  }  // Keep logging, but DO NOT overwrite Microsoft.Identity.Web's event handlers.
 
 
 
