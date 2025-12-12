@@ -137,46 +137,7 @@ else
         .AddInMemoryTokenCaches();
 
     // Keep logging, but DO NOT overwrite Microsoft.Identity.Web's event handlers.
-    builder.Services.PostConfigure<OpenIdConnectOptions>(
-        OpenIdConnectDefaults.AuthenticationScheme,
-        options =>
-        {
-            options.Events ??= new OpenIdConnectEvents();
 
-            // Chain existing handlers (critical: preserve MIW's authorization-code redemption)
-            var prevRedirect = options.Events.OnRedirectToIdentityProvider;
-            options.Events.OnRedirectToIdentityProvider = async context =>
-            {
-                Console.WriteLine("=== PROD OIDC REDIRECT ===");
-                context.ProtocolMessage.RedirectUri = "https://amadorcarlos.com/api/signin-oidc";
-                Console.WriteLine($"RedirectUri: {context.ProtocolMessage.RedirectUri}");
-                Console.WriteLine("==========================");
-
-                if (prevRedirect != null) await prevRedirect(context);
-            };
-
-            var prevFailed = options.Events.OnAuthenticationFailed;
-            options.Events.OnAuthenticationFailed = async context =>
-            {
-                Console.WriteLine("=== PROD OIDC AUTH FAILED ===");
-                Console.WriteLine($"Error: {context.Exception.Message}");
-                Console.WriteLine($"Inner: {context.Exception.InnerException?.Message}");
-                Console.WriteLine("=============================");
-
-                if (prevFailed != null) await prevFailed(context);
-            };
-
-            var prevValidated = options.Events.OnTokenValidated;
-            options.Events.OnTokenValidated = async context =>
-            {
-                Console.WriteLine("=== PROD TOKEN VALIDATED ===");
-                Console.WriteLine($"User: {context.Principal?.Identity?.Name}");
-                Console.WriteLine("============================");
-
-                if (prevValidated != null) await prevValidated(context);
-            };
-        });
-}
 
 
 // 2. Configure Cookie
