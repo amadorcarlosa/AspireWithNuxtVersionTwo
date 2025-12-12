@@ -124,10 +124,7 @@ else
                 {
                     SourceType = CertificateSource.KeyVault,
                     KeyVaultUrl = keyVaultUrl,
-                    KeyVaultCertificateName = certName,
-
-                    // <-- THIS is the missing wiring in your current branch
-                    ManagedIdentityClientId = managedIdentityClientId
+                    KeyVaultCertificateName = certName
                 }
             };
 
@@ -136,7 +133,7 @@ else
         .EnableTokenAcquisitionToCallDownstreamApi()
         .AddInMemoryTokenCaches();
 
-  }  // Keep logging, but DO NOT overwrite Microsoft.Identity.Web's event handlers.
+}  // Keep logging, but DO NOT overwrite Microsoft.Identity.Web's event handlers.
 
 
 
