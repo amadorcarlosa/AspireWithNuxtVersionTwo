@@ -124,14 +124,13 @@ else
                 {
                     SourceType = CertificateSource.KeyVault,
                     KeyVaultUrl = keyVaultUrl,
-                    KeyVaultCertificateName = certName
+                    KeyVaultCertificateName = certName,
+                    ManagedIdentityClientId = managedIdentityClientId
                 }
             };
 
             Console.WriteLine("=== Certificate configured for OIDC (KeyVault) ===");
-        })
-        .EnableTokenAcquisitionToCallDownstreamApi()
-        .AddInMemoryTokenCaches();
+        });
 
 }  // Keep logging, but DO NOT overwrite Microsoft.Identity.Web's event handlers.
 
