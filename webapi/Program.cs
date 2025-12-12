@@ -73,7 +73,7 @@ else
 
     // IMPORTANT: match your appsettings.json structure
     var keyVaultUrl = builder.Configuration["AzureAd:ClientCertificates:0:KeyVaultUrl"];
-    var certName    = builder.Configuration["AzureAd:ClientCertificates:0:KeyVaultCertificateName"];
+    var certName = builder.Configuration["AzureAd:ClientCertificates:0:KeyVaultCertificateName"];
 
     // This must be the *CLIENT ID* of the UAMI assigned to the Container App
     var managedIdentityClientId = "a8aa5450-479c-4437-87f9-891d2755d1b2";
@@ -136,36 +136,46 @@ else
         .EnableTokenAcquisitionToCallDownstreamApi()
         .AddInMemoryTokenCaches();
 
-    // Keep your event logging intact
-    builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
-    {
-        options.Events = new OpenIdConnectEvents
+    // Keep logging, but DO NOT overwrite Microsoft.Identity.Web's event handlers.
+    builder.Services.PostConfigure<OpenIdConnectOptions>(
+        OpenIdConnectDefaults.AuthenticationScheme,
+        options =>
         {
-            OnRedirectToIdentityProvider = context =>
+            options.Events ??= new OpenIdConnectEvents();
+
+            // Chain existing handlers (critical: preserve MIW's authorization-code redemption)
+            var prevRedirect = options.Events.OnRedirectToIdentityProvider;
+            options.Events.OnRedirectToIdentityProvider = async context =>
             {
                 Console.WriteLine("=== PROD OIDC REDIRECT ===");
                 context.ProtocolMessage.RedirectUri = "https://amadorcarlos.com/api/signin-oidc";
                 Console.WriteLine($"RedirectUri: {context.ProtocolMessage.RedirectUri}");
                 Console.WriteLine("==========================");
-                return Task.CompletedTask;
-            },
-            OnAuthenticationFailed = context =>
+
+                if (prevRedirect != null) await prevRedirect(context);
+            };
+
+            var prevFailed = options.Events.OnAuthenticationFailed;
+            options.Events.OnAuthenticationFailed = async context =>
             {
                 Console.WriteLine("=== PROD OIDC AUTH FAILED ===");
                 Console.WriteLine($"Error: {context.Exception.Message}");
                 Console.WriteLine($"Inner: {context.Exception.InnerException?.Message}");
                 Console.WriteLine("=============================");
-                return Task.CompletedTask;
-            },
-            OnTokenValidated = context =>
+
+                if (prevFailed != null) await prevFailed(context);
+            };
+
+            var prevValidated = options.Events.OnTokenValidated;
+            options.Events.OnTokenValidated = async context =>
             {
                 Console.WriteLine("=== PROD TOKEN VALIDATED ===");
                 Console.WriteLine($"User: {context.Principal?.Identity?.Name}");
                 Console.WriteLine("============================");
-                return Task.CompletedTask;
-            }
-        };
-    });
+
+                if (prevValidated != null) await prevValidated(context);
+            };
+        });
 }
 
 
@@ -237,7 +247,7 @@ app.Use(async (context, next) =>
         context.Request.Host = new HostString(host.ToString());
         Console.WriteLine($"Set Host from X-Public-Host: {host}");
     }
-    
+
     await next();
 });
 
