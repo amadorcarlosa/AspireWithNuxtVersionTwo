@@ -66,20 +66,21 @@ if (builder.Environment.IsDevelopment())
         };
     });
 }
-
 else
 {
     // Production: Use Key Vault Certificate via Managed Identity
     Console.WriteLine("=== PROD: Setting up Key Vault Certificate Auth ===");
-    
-    var keyVaultUrl = builder.Configuration["AzureAd:ClientCredentials:0:KeyVaultUrl"];
-    var certName = builder.Configuration["AzureAd:ClientCredentials:0:KeyVaultCertificateName"];
+
+    // ✅ FIX: read from ClientCertificates (matches your appsettings.Production.json)
+    var keyVaultUrl = builder.Configuration["AzureAd:ClientCertificates:0:KeyVaultUrl"];
+    var certName = builder.Configuration["AzureAd:ClientCertificates:0:KeyVaultCertificateName"];
+
     var managedIdentityClientId = "a8aa5450-479c-4437-87f9-891d2755d1b2";
-    
+
     Console.WriteLine($"KeyVaultUrl: {keyVaultUrl}");
     Console.WriteLine($"CertName: {certName}");
 
-    // Create credential for Key Vault access
+    // Create credential for Key Vault access (for your verification log)
     var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
     {
         ManagedIdentityClientId = managedIdentityClientId,
@@ -88,7 +89,7 @@ else
         ExcludeInteractiveBrowserCredential = true
     });
 
-    // Verify certificate exists
+    // Verify certificate exists (keep this logging)
     try
     {
         var certClient = new CertificateClient(new Uri(keyVaultUrl!), credential);
@@ -101,7 +102,6 @@ else
         Console.WriteLine($"=== CERTIFICATE VERIFICATION FAILED: {ex.Message} ===");
     }
 
-    // Configure authentication WITH EnableTokenAcquisitionToCallDownstreamApi
     builder.Services
         .AddAuthentication(options =>
         {
@@ -113,17 +113,20 @@ else
         .AddMicrosoftIdentityWebApp(msIdentityOptions =>
         {
             builder.Configuration.GetSection("AzureAd").Bind(msIdentityOptions);
-            
+
+            // Keep explicit cert wiring (fine)
             msIdentityOptions.ClientCertificates = new[]
             {
                 new CertificateDescription
                 {
                     SourceType = CertificateSource.KeyVault,
-                    KeyVaultUrl = keyVaultUrl,
-                    KeyVaultCertificateName = certName
+                    KeyVaultUrl = keyVaultUrl!,
+                    KeyVaultCertificateName = certName!
                 }
             };
-            
+
+            msIdentityOptions.SendX5C = true; // matches your config; harmless redundancy
+
             Console.WriteLine("=== Certificate configured for OIDC ===");
         })
         .EnableTokenAcquisitionToCallDownstreamApi()
@@ -161,6 +164,8 @@ else
         };
     });
 }
+
+
 // 2. Configure Cookie
 builder.Services.Configure<CookieAuthenticationOptions>(
     CookieAuthenticationDefaults.AuthenticationScheme,
