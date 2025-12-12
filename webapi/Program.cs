@@ -68,66 +68,105 @@ if (builder.Environment.IsDevelopment())
 }
 else
 {
+    // Production: Use Key Vault Certificate via Managed Identity
     Console.WriteLine("=== PROD: Setting up Key Vault Certificate Auth ===");
 
-    // You can keep these prints if you want (they're harmless),
-    // but DO NOT manually read ClientCredentials:* if your config uses ClientCertificates.
+    // IMPORTANT: match your appsettings.json structure
+    var keyVaultUrl = builder.Configuration["AzureAd:ClientCertificates:0:KeyVaultUrl"];
+    var certName    = builder.Configuration["AzureAd:ClientCertificates:0:KeyVaultCertificateName"];
+
+    // This must be the *CLIENT ID* of the UAMI assigned to the Container App
     var managedIdentityClientId = "a8aa5450-479c-4437-87f9-891d2755d1b2";
 
-    // ✅ Let Microsoft.Identity.Web bind *your existing* appsettings.json:
-    // AzureAd:ClientCertificates + SendX5C, etc.
+    Console.WriteLine($"KeyVaultUrl: {keyVaultUrl}");
+    Console.WriteLine($"CertName: {certName}");
+    Console.WriteLine($"ManagedIdentityClientId: {managedIdentityClientId}");
+
+    // Create credential for Key Vault access (your existing verification logging stays)
+    var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
+    {
+        ManagedIdentityClientId = managedIdentityClientId,
+        ExcludeVisualStudioCredential = true,
+        ExcludeAzureCliCredential = true,
+        ExcludeInteractiveBrowserCredential = true
+    });
+
+    // Verify certificate exists (keep your logging)
+    try
+    {
+        var certClient = new CertificateClient(new Uri(keyVaultUrl!), credential);
+        var cert = certClient.GetCertificate(certName);
+        Console.WriteLine($"Certificate found: {cert.Value.Name}");
+        Console.WriteLine($"Thumbprint: {BitConverter.ToString(cert.Value.Properties.X509Thumbprint).Replace("-", "")}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"=== CERTIFICATE VERIFICATION FAILED: {ex.Message} ===");
+    }
+
+    // Configure authentication (keep your structure)
     builder.Services
-        .AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
-        .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"))
+        .AddAuthentication(options =>
+        {
+            options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+        })
+        .AddMicrosoftIdentityWebApp(msIdentityOptions =>
+        {
+            builder.Configuration.GetSection("AzureAd").Bind(msIdentityOptions);
+
+            // KEY FIX: Ensure MIW's KeyVaultCertificateLoader uses the correct UAMI
+            msIdentityOptions.ClientCertificates = new[]
+            {
+                new CertificateDescription
+                {
+                    SourceType = CertificateSource.KeyVault,
+                    KeyVaultUrl = keyVaultUrl,
+                    KeyVaultCertificateName = certName,
+
+                    // <-- THIS is the missing wiring in your current branch
+                    ManagedIdentityClientId = managedIdentityClientId
+                }
+            };
+
+            Console.WriteLine("=== Certificate configured for OIDC (KeyVault) ===");
+        })
         .EnableTokenAcquisitionToCallDownstreamApi()
         .AddInMemoryTokenCaches();
 
-    // ✅ If you're using a USER-assigned managed identity, MIW needs to know which one.
-    // (Alternative is setting env var AZURE_CLIENT_ID to this value.)
-    builder.Services.Configure<MicrosoftIdentityOptions>(options =>
-    {
-        options.UserAssignedManagedIdentityClientId = managedIdentityClientId;
-    });
-
-    // ✅ Keep your logging, but DO NOT replace Events. Chain them.
+    // Keep your event logging intact
     builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
     {
-        options.Events ??= new OpenIdConnectEvents();
-
-        var priorRedirect = options.Events.OnRedirectToIdentityProvider;
-        options.Events.OnRedirectToIdentityProvider = async context =>
+        options.Events = new OpenIdConnectEvents
         {
-            Console.WriteLine("=== PROD OIDC REDIRECT ===");
-            context.ProtocolMessage.RedirectUri = "https://amadorcarlos.com/api/signin-oidc";
-            Console.WriteLine($"RedirectUri: {context.ProtocolMessage.RedirectUri}");
-            Console.WriteLine("==========================");
-
-            if (priorRedirect is not null) await priorRedirect(context);
-        };
-
-        var priorFailed = options.Events.OnAuthenticationFailed;
-        options.Events.OnAuthenticationFailed = async context =>
-        {
-            Console.WriteLine("=== PROD OIDC AUTH FAILED ===");
-            Console.WriteLine($"Error: {context.Exception.Message}");
-            Console.WriteLine($"Inner: {context.Exception.InnerException?.Message}");
-            Console.WriteLine("=============================");
-
-            if (priorFailed is not null) await priorFailed(context);
-        };
-
-        var priorValidated = options.Events.OnTokenValidated;
-        options.Events.OnTokenValidated = async context =>
-        {
-            Console.WriteLine("=== PROD TOKEN VALIDATED ===");
-            Console.WriteLine($"User: {context.Principal?.Identity?.Name}");
-            Console.WriteLine("============================");
-
-            if (priorValidated is not null) await priorValidated(context);
+            OnRedirectToIdentityProvider = context =>
+            {
+                Console.WriteLine("=== PROD OIDC REDIRECT ===");
+                context.ProtocolMessage.RedirectUri = "https://amadorcarlos.com/api/signin-oidc";
+                Console.WriteLine($"RedirectUri: {context.ProtocolMessage.RedirectUri}");
+                Console.WriteLine("==========================");
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine("=== PROD OIDC AUTH FAILED ===");
+                Console.WriteLine($"Error: {context.Exception.Message}");
+                Console.WriteLine($"Inner: {context.Exception.InnerException?.Message}");
+                Console.WriteLine("=============================");
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                Console.WriteLine("=== PROD TOKEN VALIDATED ===");
+                Console.WriteLine($"User: {context.Principal?.Identity?.Name}");
+                Console.WriteLine("============================");
+                return Task.CompletedTask;
+            }
         };
     });
 }
- 
 
 
 // 2. Configure Cookie
