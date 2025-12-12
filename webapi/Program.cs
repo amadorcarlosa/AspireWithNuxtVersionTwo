@@ -130,7 +130,21 @@ else
             };
 
             Console.WriteLine("=== Certificate configured for OIDC (KeyVault) ===");
-        });
+            Console.WriteLine($"ClientId: {msIdentityOptions.ClientId}");
+            
+        }).EnableTokenAcquisitionToCallDownstreamApi(
+            () =>
+            {
+                Console.WriteLine("=== Token acquisition for downstream API configured ===");
+            }
+        )
+        .AddInMemoryTokenCaches(
+            () =>
+            {
+                Console.WriteLine("=== In-memory token cache configured ===");
+            }
+        );
+
 
 }  // Keep logging, but DO NOT overwrite Microsoft.Identity.Web's event handlers.
 
