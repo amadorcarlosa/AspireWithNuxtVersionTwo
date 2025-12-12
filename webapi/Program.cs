@@ -68,102 +68,66 @@ if (builder.Environment.IsDevelopment())
 }
 else
 {
-    // Production: Use Key Vault Certificate via Managed Identity
     Console.WriteLine("=== PROD: Setting up Key Vault Certificate Auth ===");
 
-    // ✅ FIX: read from ClientCertificates (matches your appsettings.Production.json)
-    var keyVaultUrl = builder.Configuration["AzureAd:ClientCertificates:0:KeyVaultUrl"];
-    var certName = builder.Configuration["AzureAd:ClientCertificates:0:KeyVaultCertificateName"];
-
+    // You can keep these prints if you want (they're harmless),
+    // but DO NOT manually read ClientCredentials:* if your config uses ClientCertificates.
     var managedIdentityClientId = "a8aa5450-479c-4437-87f9-891d2755d1b2";
 
-    Console.WriteLine($"KeyVaultUrl: {keyVaultUrl}");
-    Console.WriteLine($"CertName: {certName}");
-
-    // Create credential for Key Vault access (for your verification log)
-    var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
-    {
-        ManagedIdentityClientId = managedIdentityClientId,
-        ExcludeVisualStudioCredential = true,
-        ExcludeAzureCliCredential = true,
-        ExcludeInteractiveBrowserCredential = true
-    });
-
-    // Verify certificate exists (keep this logging)
-    try
-    {
-        var certClient = new CertificateClient(new Uri(keyVaultUrl!), credential);
-        var cert = certClient.GetCertificate(certName);
-        Console.WriteLine($"Certificate found: {cert.Value.Name}");
-        Console.WriteLine($"Thumbprint: {BitConverter.ToString(cert.Value.Properties.X509Thumbprint).Replace("-", "")}");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"=== CERTIFICATE VERIFICATION FAILED: {ex.Message} ===");
-    }
-
+    // ✅ Let Microsoft.Identity.Web bind *your existing* appsettings.json:
+    // AzureAd:ClientCertificates + SendX5C, etc.
     builder.Services
-        .AddAuthentication(options =>
-        {
-            options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-            options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-            options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
-        })
-        .AddMicrosoftIdentityWebApp(msIdentityOptions =>
-        {
-            builder.Configuration.GetSection("AzureAd").Bind(msIdentityOptions);
-
-            // Keep explicit cert wiring (fine)
-            msIdentityOptions.ClientCertificates = new[]
-            {
-                new CertificateDescription
-                {
-                    SourceType = CertificateSource.KeyVault,
-                    KeyVaultUrl = keyVaultUrl!,
-                    KeyVaultCertificateName = certName!
-                }
-            };
-
-            msIdentityOptions.SendX5C = true; // matches your config; harmless redundancy
-
-            Console.WriteLine("=== Certificate configured for OIDC ===");
-        })
+        .AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+        .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"))
         .EnableTokenAcquisitionToCallDownstreamApi()
         .AddInMemoryTokenCaches();
 
+    // ✅ If you're using a USER-assigned managed identity, MIW needs to know which one.
+    // (Alternative is setting env var AZURE_CLIENT_ID to this value.)
+    builder.Services.Configure<MicrosoftIdentityOptions>(options =>
+    {
+        options.UserAssignedManagedIdentityClientId = managedIdentityClientId;
+    });
+
+    // ✅ Keep your logging, but DO NOT replace Events. Chain them.
     builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
     {
-        options.Events = new OpenIdConnectEvents
+        options.Events ??= new OpenIdConnectEvents();
+
+        var priorRedirect = options.Events.OnRedirectToIdentityProvider;
+        options.Events.OnRedirectToIdentityProvider = async context =>
         {
-            OnRedirectToIdentityProvider = context =>
-            {
-                Console.WriteLine("=== PROD OIDC REDIRECT ===");
-                context.ProtocolMessage.RedirectUri = "https://amadorcarlos.com/api/signin-oidc";
-                Console.WriteLine($"RedirectUri: {context.ProtocolMessage.RedirectUri}");
-                Console.WriteLine("==========================");
-                return Task.CompletedTask;
-            },
+            Console.WriteLine("=== PROD OIDC REDIRECT ===");
+            context.ProtocolMessage.RedirectUri = "https://amadorcarlos.com/api/signin-oidc";
+            Console.WriteLine($"RedirectUri: {context.ProtocolMessage.RedirectUri}");
+            Console.WriteLine("==========================");
 
-            OnAuthenticationFailed = context =>
-            {
-                Console.WriteLine("=== PROD OIDC AUTH FAILED ===");
-                Console.WriteLine($"Error: {context.Exception.Message}");
-                Console.WriteLine($"Inner: {context.Exception.InnerException?.Message}");
-                Console.WriteLine("=============================");
-                return Task.CompletedTask;
-            },
+            if (priorRedirect is not null) await priorRedirect(context);
+        };
 
-            OnTokenValidated = context =>
-            {
-                Console.WriteLine("=== PROD TOKEN VALIDATED ===");
-                Console.WriteLine($"User: {context.Principal?.Identity?.Name}");
-                Console.WriteLine("============================");
-                return Task.CompletedTask;
-            }
+        var priorFailed = options.Events.OnAuthenticationFailed;
+        options.Events.OnAuthenticationFailed = async context =>
+        {
+            Console.WriteLine("=== PROD OIDC AUTH FAILED ===");
+            Console.WriteLine($"Error: {context.Exception.Message}");
+            Console.WriteLine($"Inner: {context.Exception.InnerException?.Message}");
+            Console.WriteLine("=============================");
+
+            if (priorFailed is not null) await priorFailed(context);
+        };
+
+        var priorValidated = options.Events.OnTokenValidated;
+        options.Events.OnTokenValidated = async context =>
+        {
+            Console.WriteLine("=== PROD TOKEN VALIDATED ===");
+            Console.WriteLine($"User: {context.Principal?.Identity?.Name}");
+            Console.WriteLine("============================");
+
+            if (priorValidated is not null) await priorValidated(context);
         };
     });
 }
+ 
 
 
 // 2. Configure Cookie
