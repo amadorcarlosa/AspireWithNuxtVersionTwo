@@ -32,12 +32,18 @@ interface WeatherForecast {
   summary: string;
 }
 
+import type { Ref } from 'vue'
+
 /**
  * Fetches weather forecast data from the backend API.
  * Uses Nuxt's useFetch for SSR/CSR compatibility.
  * The request is proxied through server middleware to the backend API.
  */
-const { data: weatherForecasts, error, status } = await useFetch<WeatherForecast[]>('/api/weatherforecast');
+const { data: weatherForecasts, error, status } = await useAuthFetch<WeatherForecast[]>('/api/weatherforecast') as {
+  data: Ref<WeatherForecast[] | null>
+  error: Ref<Error | null>
+  status: Ref<string>
+};
 
 console.log('=== WEATHER COMPONENT DEBUG ===');
 console.log('Status:', status.value);
