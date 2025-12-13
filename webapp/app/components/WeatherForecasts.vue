@@ -11,7 +11,7 @@
  * - Renders forecast data in a tabular format with temperature in both Celsius and Fahrenheit
  * 
  * Integration:
- * - Uses Nuxt's useFetch composable for SSR-compatible data fetching
+ * Uses `useAuthFetch` (wrapping Nuxt's useFetch) for SSR-compatible data fetching and automatic 401 handling
  * - Requests are proxied through /api/weatherforecast to the backend via server middleware
  * - Backend API URL is resolved at runtime via Aspire service discovery
  */
