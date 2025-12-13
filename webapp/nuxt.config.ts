@@ -2,13 +2,20 @@
  * @file nuxt.config.ts
  * @module Configuration.Nuxt
  * @description
- * Nuxt 3 application configuration for .NET Aspire integration.
- * Configures runtime port binding, service discovery, and development environment settings.
+ * Nuxt 3 application configuration for .NET Aspire integration (BFF).
+ * This config centralizes runtime service discovery, development ergonomics, and
+ * key BFF integration points used by the app and the `webapi` backend.
  *
  * Key responsibilities:
  * - Port binding: Fixed port 3000 for development (isProxied: false in Aspire)
- * - Service discovery: Exposes backend API URL via runtime config
- * - Development security: Allows self-signed certificates in non-production environments
+ * - Service discovery: Exposes backend API URL via runtime config for server-side proxy
+ * - Security & cookies: SSR probes are cookie-aware and proxy headers are preserved
+ * - BFF integration: Server middleware forwards /api/* to the backend, rewriting
+ *   Location headers and preserving cookies for OIDC flows.
+ *
+ * Best practices for local development:
+ * - Allow self-signed certs for the backend in non-production to enable HTTPS local dev
+ * - Keep runtime config values in environment variables so container environments can set them
  *
  * @see https://nuxt.com/docs/api/configuration/nuxt-config
  */
@@ -31,6 +38,8 @@ export default defineNuxtConfig({
    * TypeScript configuration for Node.js type support.
    * Ensures Node.js types are available for server-side code.
    */
+  ssr: true,
+  modules: ['vuetify-nuxt-module'],
   typescript: {
     tsConfig: {
       compilerOptions: {
@@ -65,8 +74,12 @@ export default defineNuxtConfig({
    * This ensures ApiUrl environment variable is read at runtime, not build time.
    *
    * @property apiUrl - Backend API endpoint URL from Aspire service discovery
+   * @property publicHost - Optional public hostname used to rewrite backend Location headers
+   * @property publicProto - Optional public protocol (http/https) used to rewrite backend Location headers
    */
   runtimeConfig: {
     apiUrl: process.env.ApiUrl || 'https://localhost:7275',
+    publicHost: process.env.PUBLIC_HOSTNAME || process.env.PUBLIC_HOST || '',
+    publicProto: process.env.PUBLIC_PROTO || process.env.PUBLIC_SCHEME || '',
   },
 });

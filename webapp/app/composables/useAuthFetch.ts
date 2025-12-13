@@ -13,19 +13,25 @@ export const useAuthFetch = <T>(url: string | (() => string), options: UseFetchO
   const route = useRoute();
   const headers = import.meta.server ? useRequestHeaders(['cookie']) : undefined;
 
-  return useFetch<T>(url, {
-    ...options,
-    credentials: 'include',
+  const prevOnResponseError = (options as any).onResponseError;
+
+  const mergedOptions: any = {
+    ...(options as UseFetchOptions<T>),
+    credentials: 'include' as const,
     headers: {
       ...(options.headers as Record<string, string> | undefined),
       ...(headers as Record<string, string> | undefined),
     },
-    redirect: 'manual',
-    onResponseError({ response }) {
-      // A protected endpoint might return 401 (preferred) or a 302 (legacy challenge redirect).
-      if (!isRedirecting.value && (response?.status === 401 || response?.status === 302)) {
+    redirect: 'manual' as const,
+    onResponseError(ctx: any) {
+      if (!isRedirecting.value && (ctx.response?.status === 401 || ctx.response?.status === 302)) {
         login(route.fullPath);
       }
+      if (typeof prevOnResponseError === 'function') {
+        return prevOnResponseError(ctx);
+      }
     },
-  });
+  };
+
+  return useFetch<T>(url, mergedOptions);
 };

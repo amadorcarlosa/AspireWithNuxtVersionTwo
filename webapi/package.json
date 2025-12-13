@@ -1,0 +1,7 @@
+{
+	"dependencies": {
+		"vuetify": "^3.11.3",
+		"vuetify-nuxt-module": "^0.18.8",
+		"sass": "^1.96.0"
+	}
+}
