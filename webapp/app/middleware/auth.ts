@@ -7,7 +7,12 @@
  */
 
 export default defineNuxtRouteMiddleware(async (to) => {
-  const { isAuthenticated, pending, fetchUser, login } = useAuth();
+  const { isAuthenticated, pending, fetchUser, login, isRedirecting } = useAuth();
+
+  // Prevent re-entry while we're already in the middle of an auth redirect.
+  if (isRedirecting.value) {
+    return abortNavigation();
+  }
 
   if (pending.value) {
     await fetchUser();

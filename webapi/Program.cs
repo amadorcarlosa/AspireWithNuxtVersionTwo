@@ -246,7 +246,7 @@ app.MapGet("/auth/user", (HttpContext context) =>
         Name = context.User.Identity.Name,
         Claims = context.User.Claims.Select(c => new { c.Type, c.Value })
     });
-}).RequireAuthorization();
+});
 
 // Weather endpoint
 var summaries = new[]
@@ -254,8 +254,13 @@ var summaries = new[]
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
 };
 
-app.MapGet("/weatherforecast", () =>
+app.MapGet("/weatherforecast", (HttpContext context) =>
 {
+    if (context.User.Identity?.IsAuthenticated != true)
+    {
+        return Results.Unauthorized();
+    }
+
     var forecast = Enumerable.Range(1, 5).Select(index =>
         new WeatherForecast
         (
@@ -264,10 +269,10 @@ app.MapGet("/weatherforecast", () =>
             summaries[Random.Shared.Next(summaries.Length)]
         ))
         .ToArray();
-    return forecast;
+    return Results.Ok(forecast);
 })
 .WithName("GetWeatherForecast")
-.RequireAuthorization();
+;
 
 app.MapGet("/debug/headers", (HttpContext context) =>
 {

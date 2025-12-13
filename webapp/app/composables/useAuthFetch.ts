@@ -9,14 +9,21 @@
 import type { UseFetchOptions } from 'nuxt/app';
 
 export const useAuthFetch = <T>(url: string | (() => string), options: UseFetchOptions<T> = {}) => {
-  const { login } = useAuth();
+  const { login, isRedirecting } = useAuth();
   const route = useRoute();
+  const headers = import.meta.server ? useRequestHeaders(['cookie']) : undefined;
 
   return useFetch<T>(url, {
     ...options,
     credentials: 'include',
+    headers: {
+      ...(options.headers as Record<string, string> | undefined),
+      ...(headers as Record<string, string> | undefined),
+    },
+    redirect: 'manual',
     onResponseError({ response }) {
-      if (response?.status === 401) {
+      // A protected endpoint might return 401 (preferred) or a 302 (legacy challenge redirect).
+      if (!isRedirecting.value && (response?.status === 401 || response?.status === 302)) {
         login(route.fullPath);
       }
     },
