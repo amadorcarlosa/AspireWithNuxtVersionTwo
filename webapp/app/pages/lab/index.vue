@@ -18,12 +18,31 @@ const experiments = [
   },
   {
     title: 'Neural Voice Synthesizer',   // <--- UPDATED
-    subtitle: 'Azure Speech & Managed Identity',
-    icon: 'mdi-microphone',             // <--- UPDATED to match mdi style
+    subtitle: 'Azure Speech, Text-to-Speech (TTS), & Managed Identity',
+    icon: 'mdi-volume-high',            // <--- UPDATED to match mdi style
     color: 'purple',
     to: '/lab/speech',                  // <--- Points to the new page
     description: 'Test Azure Cognitive Services speech synthesis. Verifies the secure token exchange and audio stream rendering.',
     status: 'Active'                    // <--- Now Active
+  },
+
+  {
+    title: 'Project Nacho',        // <--- ADDING THIS
+    subtitle: 'Reading Assessment (STT)',
+    icon: 'mdi-microphone-settings', // Input/Settings icon
+    color: 'deep-orange',
+    to: '/lab/nacho',
+    description: 'Syllable-level pronunciation grader for Spanish literacy. Listens to mic input and grades accuracy.',
+    status: 'Active'
+  },
+  {
+    title: 'Azure JSON Inspector',   // <--- NEW TOOL
+    subtitle: 'Raw Payload Analysis',
+    icon: 'mdi-code-json',
+    color: 'blue-grey',
+    to: '/lab/inspector',
+    description: 'Diagnostic tool. Captures microphone input and renders the raw JSON response from Azure to debug phoneme and syllable boundaries.',
+    status: 'Active'
   },
   {
     title: 'Real-Time Event Bus',
