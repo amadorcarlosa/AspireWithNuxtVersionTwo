@@ -1,15 +1,13 @@
-using System.IO.Pipes;
-using System.Security.AccessControl;
+
 using Azure.Identity;
-using Azure.Security.KeyVault.Certificates;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Identity.Web;
 using Azure.Core;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+
 using Scalar.AspNetCore; // <--- ADDED: Required for Scalar UI
 
 var builder = WebApplication.CreateBuilder(args);
@@ -66,9 +64,9 @@ if (builder.Environment.IsDevelopment())
 else
 {
     Console.WriteLine("=== PROD: Setting up Key Vault Certificate Auth ===");
-    var keyVaultUrl = builder.Configuration["AzureAd:ClientCertificates:0:KeyVaultUrl"];
-    var certName = builder.Configuration["AzureAd:ClientCertificates:0:KeyVaultCertificateName"];
-    var managedIdentityClientId = builder.Configuration["Azure:ManagedIdentityClientId"]; // Load from config if possible
+    var keyVaultUrl = AuthConfig.EntraExternal.Production.KeyVaultUrl;
+    var certName = AuthConfig.EntraExternal.Production.CertificateName;
+    var managedIdentityClientId = AuthConfig.EntraExternal.Production.ManagedIdentityClientId;
 
     var credential = new DefaultAzureCredential(new DefaultAzureCredentialOptions
     {
@@ -191,12 +189,12 @@ app.MapGet("/auth/user", (HttpContext context) =>
 .WithName("GetUser")
 .WithTags("Auth");
 
-app.MapGet("/speech/token", async (IConfiguration config, HttpClient client) =>
+app.MapGet("/speech/token", async (HttpClient client) =>
 {
     // 1. READ CONFIG
-    var region = config["Azure:Speech:Region"];
-    var managedIdentityClientId = config["Azure:ManagedIdentityClientId"];
-    var tenantId = config["Azure:TenantId"]; 
+    var region = AuthConfig.AzureServices.SpeechService.Region;
+    var managedIdentityClientId = AuthConfig.AzureServices.SpeechService.ManagedIdentityClientId;
+    var tenantId = AuthConfig.AzureServices.SpeechService.TenantId;
 
     // --- DEBUG LOGGING ---
     Console.WriteLine("--------------------------------------------------");
@@ -227,13 +225,13 @@ app.MapGet("/speech/token", async (IConfiguration config, HttpClient client) =>
         // 3. GET AZURE AD TOKEN
         Console.WriteLine("[Auth] Requesting Azure AD Token...");
         var aadToken = await credential.GetTokenAsync(
-            new TokenRequestContext(new[] { "https://cognitiveservices.azure.com/.default" })
+            new TokenRequestContext(new[] { AuthConfig.AzureServices.SpeechService.Scope })
         );
         Console.WriteLine("[Auth] Azure AD Token acquired successfully.");
 
         // 4. EXCHANGE FOR SPEECH TOKEN
-        var subdomain = "vue-mathtabla-voice"; 
-        var fetchUri = $"https://{subdomain}.cognitiveservices.azure.com/sts/v1.0/issueToken";
+        var fetchUri = AuthConfig.AzureServices.SpeechService.FetchUri;
+       
         
         Console.WriteLine($"[Exchange] Posting to: {fetchUri}");
 
