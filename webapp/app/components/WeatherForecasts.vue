@@ -17,71 +17,88 @@
  */
 -->
 <script setup lang="ts">
-/**
- * Weather forecast data structure from the backend API.
- * Represents a single day's weather prediction.
- */
+import type { Ref } from 'vue'
+
 interface WeatherForecast {
-  /** ISO 8601 date string for the forecast day */
   date: string;
-  /** Temperature in Celsius */
   temperatureC: number;
-  /** Temperature in Fahrenheit */
   temperatureF: number;
-  /** Weather condition summary (e.g., "Sunny", "Rainy") */
   summary: string;
 }
 
-import type { Ref } from 'vue'
+// Fetch data using your secure composable
+const { data: forecasts, error, status } = await useAuthFetch<WeatherForecast[]>('/api/weatherforecast')
 
-/**
- * Fetches weather forecast data from the backend API.
- * Uses Nuxt's useFetch for SSR/CSR compatibility.
- * The request is proxied through server middleware to the backend API.
- */
-const { data: weatherForecasts, error, status } = await useAuthFetch<WeatherForecast[]>('/api/weatherforecast') as {
-  data: Ref<WeatherForecast[] | null>
-  error: Ref<Error | null>
-  status: Ref<string>
-};
+// Helper for weather icons
+const getWeatherIcon = (summary: string) => {
+  const s = summary.toLowerCase()
+  if (s.includes('rain') || s.includes('drizzle')) return 'mdi-weather-rainy'
+  if (s.includes('cloud')) return 'mdi-weather-cloudy'
+  if (s.includes('snow')) return 'mdi-weather-snowy'
+  if (s.includes('sun') || s.includes('clear')) return 'mdi-weather-sunny'
+  return 'mdi-weather-partly-cloudy'
+}
 
-console.log('=== WEATHER COMPONENT DEBUG ===');
-console.log('Status:', status.value);
-console.log('Data:', weatherForecasts.value);
-console.log('Error:', error.value);
-console.log('===============================');
+// Helper for temperature color
+const getTempColor = (tempC: number) => {
+  if (tempC > 30) return 'red-darken-1'
+  if (tempC > 20) return 'orange-darken-1'
+  if (tempC > 10) return 'green-darken-1'
+  return 'blue-darken-1'
+}
 </script>
 
 <template>
-  <div>
-    <div v-if="error" style="color: red;">
-      Error: {{ error.message }}
+  <v-card border elevation="0">
+    <div v-if="status === 'pending'" class="pa-4">
+      <div class="text-center mb-4">Establishing secure connection...</div>
+      <v-progress-linear indeterminate color="primary" />
     </div>
-    <div v-else-if="status === 'pending'">
-      Loading...
-    </div>
-    <div v-else-if="weatherForecasts">
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Summary</th>
-            <th>T (°C)</th>
-            <th>T (°F)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in weatherForecasts" :key="item.date">
-            <td>{{ item.date }}</td>
-            <td>{{ item.summary }}</td>
-            <td>{{ item.temperatureC }}</td>
-            <td>{{ item.temperatureF }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div v-else>
-      No data
-    </div>
-  </div>
+
+    <v-alert
+      v-else-if="error"
+      type="error"
+      title="Access Denied / API Error"
+      variant="tonal"
+      class="ma-4"
+    >
+      {{ error.message }}
+      <div class="mt-2 text-caption">
+        Debug: Check if your .NET backend is running on port 5105.
+      </div>
+    </v-alert>
+
+    <v-table v-else hover>
+      <thead>
+        <tr>
+          <th class="text-left">Date</th>
+          <th class="text-left">Condition</th>
+          <th class="text-right">Temp (°C)</th>
+          <th class="text-right">Temp (°F)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="item in forecasts" :key="item.date">
+          <td>
+            {{ new Date(item.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) }}
+          </td>
+          
+          <td>
+            <v-chip size="small" variant="tonal" class="text-capitalize">
+              <v-icon start :icon="getWeatherIcon(item.summary)" />
+              {{ item.summary }}
+            </v-chip>
+          </td>
+
+          <td class="text-right font-weight-bold" :class="`text-${getTempColor(item.temperatureC)}`">
+            {{ item.temperatureC }}°
+          </td>
+
+          <td class="text-right text-grey">
+            {{ item.temperatureF }}°
+          </td>
+        </tr>
+      </tbody>
+    </v-table>
+  </v-card>
 </template>
